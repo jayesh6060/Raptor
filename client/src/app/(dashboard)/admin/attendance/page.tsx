@@ -2,65 +2,100 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Search, UserCheck, Calendar as CalendarIcon, Save, Check, X } from 'lucide-react';
+import { Search, UserCheck, Calendar as CalendarIcon, Save, Check, X, Loader2, BookOpen, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Badge } from '@/components/ui/Badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/Table';
 
 export default function AttendanceMarking() {
   const [students, setStudents] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
-  const [subject, setSubject] = useState('');
+  const [selectedCourseId, setSelectedCourseId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const [fetchingStudents, setFetchingStudents] = useState(false);
+  const { profile } = useAuth();
 
   useEffect(() => {
-    async function fetchData() {
-      // Fetch Students
-      const { data: studentData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'student');
-      setStudents(studentData || []);
+    async function fetchTeacherCourses() {
+      if (!profile?.id) return;
       
-      // Fetch Courses assigned to this teacher
-      const { data: courseData } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('teacher_id', user?.id)
-        .order('name', { ascending: true });
-      setCourses(courseData || []);
-      
-      if (courseData && courseData.length > 0) {
-        setSubject(courseData[0].name);
-      } else {
-        setSubject('');
-      }
+      setLoading(true);
+      const { data: assignmentData } = await supabase
+        .from('teacher_assignments')
+        .select('course_id, courses(*)')
+        .eq('teacher_id', profile.id);
 
-      // Initialize attendance state with 'present'
-      const initial: Record<string, string> = {};
-      studentData?.forEach(s => initial[s.id] = 'present');
-      setAttendance(initial);
+      const teacherCourses = (assignmentData?.map((a: any) => {
+        const c = a.courses;
+        return Array.isArray(c) ? c[0] : c;
+      }) || []) as any[];
+
       setLoading(false);
+      setCourses(teacherCourses);
+      
+      if (teacherCourses.length > 0) {
+        setSelectedCourseId((teacherCourses[0] as any)?.id || '');
+      }
     }
-    fetchData();
-  }, []);
+    fetchTeacherCourses();
+  }, [profile?.id]);
+
+  useEffect(() => {
+    async function fetchEnrolledStudents() {
+      if (!selectedCourseId) {
+        setStudents([]);
+        return;
+      }
+      
+      setFetchingStudents(true);
+      const { data: enrollmentData } = await supabase
+        .from('enrollments')
+        .select('student_id, profiles(*)')
+        .eq('course_id', selectedCourseId);
+
+      const enrolledStudents = (enrollmentData?.map((e: any) => e.profiles) || []) as any[];
+      setStudents(enrolledStudents);
+      
+      const initial: Record<string, string> = {};
+      enrolledStudents.forEach(s => initial[s.id] = 'present');
+      setAttendance(initial);
+      setFetchingStudents(false);
+    }
+    fetchEnrolledStudents();
+  }, [selectedCourseId]);
 
   const handleStatusChange = (studentId: string, status: string) => {
     setAttendance(prev => ({ ...prev, [studentId]: status }));
   };
 
   const handleSave = async () => {
+    if (!selectedCourseId) return;
+
+    const selectedCourse = courses.find((c: any) => c.id === selectedCourseId);
+    
     const records = Object.entries(attendance).map(([studentId, status]) => ({
       student_id: studentId,
-      subject,
+      course_id: selectedCourseId,
+      subject: (selectedCourse as any)?.name || 'Unknown',
       date,
       status
     }));
 
     const { error } = await supabase.from('attendance').upsert(records, {
-      onConflict: 'student_id, date, subject'
+      onConflict: 'student_id, date, course_id'
     });
 
     if (error) {
@@ -70,107 +105,142 @@ export default function AttendanceMarking() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+        <Loader2 className="animate-spin text-primary" size={48} />
+        <p className="text-muted-foreground font-black uppercase tracking-widest text-xs">Loading faculty system...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-10 pb-20">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Mark Attendance</h1>
-          <p className="text-slate-500">Record daily attendance for students.</p>
+          <h1 className="text-4xl font-black text-foreground tracking-tight italic uppercase">Attendance Hub</h1>
+          <p className="text-muted-foreground font-medium mt-1">Mark and manage attendance records for your assigned courses.</p>
         </div>
-        <button 
+        <Button 
           onClick={handleSave}
-          className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow-md hover:bg-indigo-700 transition-all"
+          disabled={students.length === 0}
+          variant="gradient"
+          className="h-14 px-8 rounded-2xl font-black uppercase text-xs tracking-widest shadow-strong"
         >
-          <Save size={18} />
-          Save All
-        </button>
+          <Save size={18} className="mr-2" />
+          Finalize Roll
+        </Button>
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4">
-        <div className="flex-1 space-y-2">
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Subject</label>
-          <select 
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-          >
-            {courses.map(course => (
-              <option key={course.id} value={course.name}>{course.code} - {course.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex-1 space-y-2">
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date</label>
-          <div className="relative">
-            <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="p-7 border-border shadow-soft space-y-3 bg-card/50 backdrop-blur-md">
+          <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Current Subject</label>
+          <div className="relative group">
+             <BookOpen className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors z-10" size={18} />
+             <select 
+                value={selectedCourseId}
+                onChange={(e) => setSelectedCourseId(e.target.value)}
+                className="w-full h-14 pl-12 pr-4 bg-muted/10 border border-border rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all appearance-none cursor-pointer"
+             >
+                {courses.length > 0 ? courses.map(course => (
+                  <option key={course.id} value={course.id}>{course.code} — {course.name}</option>
+                )) : (
+                  <option value="">No subjects assigned</option>
+                )}
+             </select>
+          </div>
+        </Card>
+        
+        <Card className="p-7 border-border shadow-soft space-y-3 bg-card/50 backdrop-blur-md">
+          <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">Marking Date</label>
+          <div className="relative group">
+            <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors z-10" size={18} />
+            <Input 
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="h-14 pl-12 rounded-2xl border-border bg-muted/10 font-bold focus-visible:ring-primary/20"
             />
           </div>
-        </div>
+        </Card>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr>
-              <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Student</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {students.map((student) => (
-              <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
-                      {student.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{student.name}</p>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-tight">
-                          {student.usn || 'No USN'}
-                        </span>
-                        <p className="text-xs text-slate-400">{student.email}</p>
+      <Card className="border-border shadow-strong overflow-hidden bg-card/50 backdrop-blur-md">
+        {fetchingStudents ? (
+          <div className="py-24 flex flex-col items-center justify-center gap-6 text-muted-foreground">
+             <Loader2 className="animate-spin text-primary" size={32} />
+             <p className="text-[10px] font-black uppercase tracking-[0.2em]">Compiling Enrollment Registry...</p>
+          </div>
+        ) : students.length > 0 ? (
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow className="border-border">
+                <TableHead className="px-10 py-6 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Candidate</TableHead>
+                <TableHead className="px-10 py-6 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Status Toggle</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {students.map((student) => (
+                <TableRow key={student.id} className="hover:bg-muted/30 transition-colors border-border group">
+                  <TableCell className="px-10 py-7">
+                    <div className="flex items-center gap-5">
+                      <div className="w-12 h-12 rounded-2xl bg-muted text-muted-foreground flex items-center justify-center font-black text-sm border border-border group-hover:bg-primary/10 group-hover:text-primary group-hover:border-primary/20 group-hover:scale-110 transition-all">
+                        {student.name?.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-base font-black text-foreground tracking-tight uppercase italic group-hover:text-primary transition-colors">{student.name}</p>
+                        <Badge variant="outline" className="mt-1 text-[9px] font-black border-border bg-muted/30 text-muted-foreground uppercase tracking-widest px-2 py-0.5">
+                          {student.usn || 'PENDING'}
+                        </Badge>
                       </div>
                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center justify-center gap-4">
-                    <button
-                      onClick={() => handleStatusChange(student.id, 'present')}
-                      className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center transition-all border-2",
-                        attendance[student.id] === 'present'
-                          ? "bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-200"
-                          : "bg-white border-slate-100 text-slate-300 hover:border-emerald-200 hover:text-emerald-400"
-                      )}
-                    >
-                      <Check size={20} strokeWidth={3} />
-                    </button>
-                    <button
-                      onClick={() => handleStatusChange(student.id, 'absent')}
-                      className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center transition-all border-2",
-                        attendance[student.id] === 'absent'
-                          ? "bg-red-500 border-red-500 text-white shadow-lg shadow-red-200"
-                          : "bg-white border-slate-100 text-slate-300 hover:border-red-200 hover:text-red-400"
-                      )}
-                    >
-                      <X size={20} strokeWidth={3} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  </TableCell>
+                  <TableCell className="px-10 py-7">
+                    <div className="flex items-center justify-center gap-4">
+                      <Button
+                        onClick={() => handleStatusChange(student.id, 'present')}
+                        variant={attendance[student.id] === 'present' ? 'default' : 'outline'}
+                        className={cn(
+                          "h-12 px-7 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all",
+                          attendance[student.id] === 'present' 
+                            ? "bg-success text-white shadow-lg shadow-success/20 hover:bg-success/90" 
+                            : "text-muted-foreground hover:border-success/30 hover:text-success"
+                        )}
+                      >
+                        <Check size={14} className="mr-2" strokeWidth={4} />
+                        Present
+                      </Button>
+                      <Button
+                        onClick={() => handleStatusChange(student.id, 'absent')}
+                        variant={attendance[student.id] === 'absent' ? 'destructive' : 'outline'}
+                        className={cn(
+                          "h-12 px-7 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all",
+                          attendance[student.id] === 'absent' 
+                            ? "bg-destructive text-white shadow-lg shadow-destructive/20" 
+                            : "text-muted-foreground hover:border-destructive/30 hover:text-destructive"
+                        )}
+                      >
+                        <X size={14} className="mr-2" strokeWidth={4} />
+                        Absent
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <div className="py-32 text-center space-y-6">
+             <div className="w-20 h-20 bg-muted text-muted-foreground/30 rounded-[32px] flex items-center justify-center mx-auto border-2 border-dashed border-border group-hover:scale-110 transition-transform">
+                <Users size={40} />
+             </div>
+             <div>
+                <p className="text-foreground font-black uppercase text-lg tracking-tight italic">Registry Empty</p>
+                <p className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.2em] mt-1">No candidates enrolled in this subject yet.</p>
+             </div>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

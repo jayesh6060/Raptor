@@ -17,14 +17,15 @@ export default function LoginPage() {
 
   // Handle automatic redirection if user becomes available
   React.useEffect(() => {
-    if (user && profile) {
-      if (profile.role === 'admin') {
+    if (user && !authLoading) {
+      const role = profile?.role || 'student';
+      if (role === 'admin' || role === 'teacher') {
         router.push('/admin/dashboard');
       } else {
         router.push('/student/dashboard');
       }
     }
-  }, [user, profile, router]);
+  }, [user, profile, authLoading, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,36 +43,38 @@ export default function LoginPage() {
       return;
     }
 
-    // Navigation is now handled by DashboardLayout and AuthProvider updates
+    // Navigation is handle by useEffect above. 
+    // We don't call setLoading(false) here on success to keep the spinner 
+    // until redirection occurs.
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-8 border border-slate-100">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 transition-colors duration-500">
+      <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-none p-8 border border-slate-100 dark:border-slate-800">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-600 text-white mb-4 shadow-lg shadow-indigo-200">
             <LogIn size={32} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Welcome Back</h1>
-          <p className="text-slate-500 mt-2">Sign in to your College Portal</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Welcome Back</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-2">Sign in to the Raptor System</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
           {error && (
-            <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg">
+            <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm rounded-lg">
               {error}
             </div>
           )}
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700 ml-1">Email Address</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300 ml-1">Email Address</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input
+               <input
                 type="email"
                 required
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                placeholder="name@college.edu"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-500/10 transition-all dark:text-slate-200"
+                placeholder="name@raptor.edu"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -80,15 +83,15 @@ export default function LoginPage() {
 
           <div className="space-y-2">
             <div className="flex justify-between items-center ml-1">
-              <label className="text-sm font-medium text-slate-700">Password</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Password</label>
               <a href="#" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">Forgot?</a>
             </div>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input
+               <input
                 type="password"
                 required
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-500/10 transition-all dark:text-slate-200"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

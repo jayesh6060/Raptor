@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useParams, useRouter } from 'next/navigation';
 import { Plus, Trash2, ArrowLeft, Save, CheckCircle2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function ExamQuestions() {
   const { id } = useParams();

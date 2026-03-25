@@ -11,6 +11,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [usn, setUsn] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -23,6 +24,33 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
 
+    if (role === 'student') {
+      const usnFormat = /^[1-9][a-zA-Z]{2}\d{2}[a-zA-Z]{2}\d{3}$/i;
+      const formattedUsn = usn.trim().toUpperCase();
+      
+      if (!usnFormat.test(formattedUsn)) {
+        setError('Invalid USN format. Example: 1RV20CS001');
+        setLoading(false);
+        return;
+      }
+
+      // Check if email is explicitly allowed by the Admin.
+      // (Commented out during development so you can test signups freely)
+      /* 
+      const { data: allowedEmail, error: allowedError } = await supabase
+        .from('allowed_emails')
+        .select('*')
+        .eq('email', email.trim())
+        .single();
+
+      if (allowedError || !allowedEmail) {
+        setError('Verification failed. Your email has not been authorized by the administration. Please contact the admin to gain access.');
+        setLoading(false);
+        return;
+      }
+      */
+    }
+
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -31,6 +59,7 @@ export default function SignupPage() {
         data: {
           full_name: fullName,
           role: role, // Dynamically set role
+          usn: role === 'student' ? usn.trim().toUpperCase() : null,
         },
       },
     });
@@ -41,12 +70,35 @@ export default function SignupPage() {
       return;
     }
 
-    // Since we want to ensure a profile is created even if they haven't verified yet,
-    // we can use a Supabase Edge Function or Trigger. 
-    // For this implementation, we inform them to check their email.
-    // The profile creation will be handled by a trigger (ideally) 
-    // or on first login in our DashboardLayout.
+    // Forcefully create the profile fallback over frontend in case the SQL trigger drops out
+    if (data?.user) {
+      const { error: upsertError } = await supabase.from('profiles').upsert({
+        id: data.user.id,
+        name: fullName,
+        email: email,
+        role: role,
+        usn: role === 'student' ? usn.trim().toUpperCase() : null,
+      }, { onConflict: 'id' });
+      
+      if (upsertError) {
+        // Use console.warn instead of console.error to prevent Next.js dev overlay from showing up
+        console.warn('Silent upsert error:', upsertError);
+      }
+    }
 
+    // If Supabase has "Confirm Email" disabled, data.session WILL exist here!
+    if (data?.session) {
+      if (role === 'admin' || role === 'teacher') {
+        router.push('/admin/dashboard');
+      } else {
+        router.push('/student/dashboard');
+      }
+      return;
+    }
+
+    // Since we want to ensure a profile is created even if they haven't verified yet,
+    // we can use a Supabase Edge Function or Trigger.
+    // For this implementation, we inform them to check their email.
     setSuccess(true);
     setLoading(false);
   };
@@ -66,14 +118,14 @@ export default function SignupPage() {
 
   if (success) {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-          <div className="max-w-md w-full bg-white rounded-[32px] shadow-2xl shadow-indigo-100 p-10 border border-slate-100 text-center space-y-6">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-emerald-100 text-emerald-600 mb-2">
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 transition-colors duration-500">
+          <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl shadow-indigo-100 dark:shadow-none p-10 border border-slate-100 dark:border-slate-800 text-center space-y-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 mb-2">
               <CheckCircle2 size={40} />
             </div>
-            <h1 className="text-3xl font-black text-slate-900">Verify your Email</h1>
-            <p className="text-slate-500 text-lg">
-                We&apos;ve sent a magic link to <span className="font-bold text-slate-900">{email}</span>. 
+            <h1 className="text-3xl font-black text-slate-900 dark:text-white">Verify your Email</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-lg">
+                We&apos;ve sent a magic link to <span className="font-bold text-slate-900 dark:text-white">{email}</span>. 
                 Please click the link to activate your student account.
             </p>
             <div className="pt-4 flex flex-col gap-4">
@@ -83,7 +135,7 @@ export default function SignupPage() {
                 <button 
                     onClick={handleResend} 
                     disabled={resending}
-                    className="w-full py-4 bg-white border border-slate-200 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                     {resending ? <Loader2 className="animate-spin" size={20} /> : 'Resend Verification Email'}
                 </button>
@@ -103,14 +155,14 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 py-12">
-      <div className="max-w-md w-full bg-white rounded-[40px] shadow-2xl shadow-slate-200/50 p-10 border border-slate-100">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 py-12 transition-colors duration-500">
+      <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-[40px] shadow-2xl shadow-slate-200/50 dark:shadow-none p-10 border border-slate-100 dark:border-slate-800">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-600 text-white mb-4 shadow-lg shadow-indigo-200">
             <UserPlus size={32} />
           </div>
-          <h1 className="text-3xl font-black text-slate-900">Create Account</h1>
-          <p className="text-slate-500 mt-2 font-medium">Join the student community today</p>
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white">Create Account</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Join the student community today</p>
         </div>
 
         <form onSubmit={handleSignup} className="space-y-6">
@@ -128,7 +180,7 @@ export default function SignupPage() {
               <input
                 type="text"
                 required
-                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500/20 transition-all font-medium"
+                className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/50 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500/20 transition-all font-medium dark:text-slate-200"
                 placeholder="John Doe"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -143,13 +195,31 @@ export default function SignupPage() {
               <input
                 type="email"
                 required
-                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500/20 transition-all font-medium"
-                placeholder="student@college.edu"
+                className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/50 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500/20 transition-all font-medium dark:text-slate-200"
+                placeholder="student@raptor.edu"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
           </div>
+
+          {role === 'student' && (
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">USN Number</label>
+              <div className="relative group">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={18} />
+                <input
+                  type="text"
+                  required
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/50 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500/20 transition-all font-medium uppercase dark:text-slate-200"
+                  placeholder="1RV20CS001"
+                  value={usn}
+                  onChange={(e) => setUsn(e.target.value.toUpperCase())}
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter px-2 mt-1">Required for student verification</p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
@@ -159,7 +229,7 @@ export default function SignupPage() {
                 type="password"
                 required
                 minLength={6}
-                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500/20 transition-all font-medium"
+                className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/50 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500/20 transition-all font-medium dark:text-slate-200"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -170,8 +240,8 @@ export default function SignupPage() {
 
           <div className="space-y-2">
             <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Joining as a</label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['student', 'teacher', 'admin'] as const).map((r) => (
+            <div className="grid grid-cols-2 gap-2">
+              {(['student', 'teacher'] as const).map((r) => (
                 <button
                   key={r}
                   type="button"
@@ -179,8 +249,8 @@ export default function SignupPage() {
                   className={cn(
                     "py-3 rounded-2xl border-2 text-xs font-bold capitalize transition-all",
                     role === r 
-                      ? "border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm" 
-                      : "border-slate-50 bg-slate-50 text-slate-500 hover:border-slate-200"
+                      ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 shadow-sm" 
+                      : "border-slate-50 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-200 dark:hover:border-slate-700"
                   )}
                 >
                   {r}
