@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = "force-dynamic";
 
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
@@ -29,7 +30,7 @@ export default function DashboardLayout({
       }
 
       const pathname = window.location.pathname;
-      
+
       if (profile) {
         // Allow shared routes like /profile
         if (pathname === '/profile') return;
@@ -53,17 +54,17 @@ export default function DashboardLayout({
         <div className="scan-effect" />
         <div className="relative z-10 flex flex-col items-center">
           <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-strong mb-10 relative group">
-             <div className="absolute inset-0 bg-indigo-600 rounded-2xl animate-ping opacity-20" />
-             <Zap size={32} className="text-white relative z-10" fill="currentColor" />
+            <div className="absolute inset-0 bg-indigo-600 rounded-2xl animate-ping opacity-20" />
+            <Zap size={32} className="text-white relative z-10" fill="currentColor" />
           </div>
           <div className="space-y-4 text-center">
-             <div className="flex items-center justify-center gap-3">
-                <span className="text-[10px] font-black txt-future text-indigo-600 tracking-[0.3em]">INITIALIZING</span>
-                <span className="text-[10px] font-black font-brand text-slate-900 tracking-widest">RAPTOR NODE</span>
-             </div>
-             <div className="tactical-loader-bg mx-auto">
-                <div className="tactical-loader-fill" />
-             </div>
+            <div className="flex items-center justify-center gap-3">
+              <span className="text-[10px] font-black txt-future text-indigo-600 tracking-[0.3em]">INITIALIZING</span>
+              <span className="text-[10px] font-black font-brand text-slate-900 tracking-widest">RAPTOR NODE</span>
+            </div>
+            <div className="tactical-loader-bg mx-auto">
+              <div className="tactical-loader-fill" />
+            </div>
           </div>
         </div>
       </div>
@@ -80,7 +81,7 @@ export default function DashboardLayout({
       <div className="flex-1 pl-80 pr-10">
         <Navbar />
         <div className="max-w-[1700px] mx-auto">
-          <main 
+          <main
             className={cn(
               "p-8 pb-32 transition-all duration-700 ease-out",
               (!mounted) ? 'opacity-50 blur-[2px]' : (loading ? 'opacity-80' : 'opacity-100')

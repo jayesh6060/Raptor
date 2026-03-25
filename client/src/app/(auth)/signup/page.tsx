@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = "force-dynamic";
 
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -27,7 +28,7 @@ export default function SignupPage() {
     if (role === 'student') {
       const usnFormat = /^[1-9][a-zA-Z]{2}\d{2}[a-zA-Z]{2}\d{3}$/i;
       const formattedUsn = usn.trim().toUpperCase();
-      
+
       if (!usnFormat.test(formattedUsn)) {
         setError('Invalid USN format. Example: 1RV20CS001');
         setLoading(false);
@@ -79,7 +80,7 @@ export default function SignupPage() {
         role: role,
         usn: role === 'student' ? usn.trim().toUpperCase() : null,
       }, { onConflict: 'id' });
-      
+
       if (upsertError) {
         // Use console.warn instead of console.error to prevent Next.js dev overlay from showing up
         console.warn('Silent upsert error:', upsertError);
@@ -118,39 +119,39 @@ export default function SignupPage() {
 
   if (success) {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 transition-colors duration-500">
-          <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl shadow-indigo-100 dark:shadow-none p-10 border border-slate-100 dark:border-slate-800 text-center space-y-6">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 mb-2">
-              <CheckCircle2 size={40} />
-            </div>
-            <h1 className="text-3xl font-black text-slate-900 dark:text-white">Verify your Email</h1>
-            <p className="text-slate-500 dark:text-slate-400 text-lg">
-                We&apos;ve sent a magic link to <span className="font-bold text-slate-900 dark:text-white">{email}</span>. 
-                Please click the link to activate your student account.
-            </p>
-            <div className="pt-4 flex flex-col gap-4">
-                <Link href="/login" className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
-                    Go to Login
-                </Link>
-                <button 
-                    onClick={handleResend} 
-                    disabled={resending}
-                    className="w-full py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                    {resending ? <Loader2 className="animate-spin" size={20} /> : 'Resend Verification Email'}
-                </button>
-                <button onClick={() => setSuccess(false)} className="text-sm font-bold text-slate-400 hover:text-slate-600">
-                    Entered the wrong email?
-                </button>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 transition-colors duration-500">
+        <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl shadow-indigo-100 dark:shadow-none p-10 border border-slate-100 dark:border-slate-800 text-center space-y-6">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 mb-2">
+            <CheckCircle2 size={40} />
+          </div>
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white">Verify your Email</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-lg">
+            We&apos;ve sent a magic link to <span className="font-bold text-slate-900 dark:text-white">{email}</span>.
+            Please click the link to activate your student account.
+          </p>
+          <div className="pt-4 flex flex-col gap-4">
+            <Link href="/login" className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+              Go to Login
+            </Link>
+            <button
+              onClick={handleResend}
+              disabled={resending}
+              className="w-full py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {resending ? <Loader2 className="animate-spin" size={20} /> : 'Resend Verification Email'}
+            </button>
+            <button onClick={() => setSuccess(false)} className="text-sm font-bold text-slate-400 hover:text-slate-600">
+              Entered the wrong email?
+            </button>
 
-                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 mt-4">
-                  <p className="text-[10px] text-amber-700 font-bold uppercase tracking-wider leading-relaxed">
-                    Note: Supabase Free Tier permits only 3 emails per hour. If you don&apos;t see the email, please check your spam or try again later.
-                  </p>
-                </div>
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 mt-4">
+              <p className="text-[10px] text-amber-700 font-bold uppercase tracking-wider leading-relaxed">
+                Note: Supabase Free Tier permits only 3 emails per hour. If you don&apos;t see the email, please check your spam or try again later.
+              </p>
             </div>
           </div>
         </div>
+      </div>
     );
   }
 
@@ -168,8 +169,8 @@ export default function SignupPage() {
         <form onSubmit={handleSignup} className="space-y-6">
           {error && (
             <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-sm rounded-2xl font-bold flex items-center gap-2">
-                <span className="w-2 h-2 bg-red-500 rounded-full shrink-0"></span>
-                {error}
+              <span className="w-2 h-2 bg-red-500 rounded-full shrink-0"></span>
+              {error}
             </div>
           )}
 
@@ -248,8 +249,8 @@ export default function SignupPage() {
                   onClick={() => setRole(r)}
                   className={cn(
                     "py-3 rounded-2xl border-2 text-xs font-bold capitalize transition-all",
-                    role === r 
-                      ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 shadow-sm" 
+                    role === r
+                      ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 shadow-sm"
                       : "border-slate-50 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-200 dark:hover:border-slate-700"
                   )}
                 >
