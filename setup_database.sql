@@ -129,4 +129,21 @@ DROP POLICY IF EXISTS "Admins can manage exams." ON public.exams;
 CREATE POLICY "Admins can manage exams." ON public.exams FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
 
 DROP POLICY IF EXISTS "Admins can manage questions." ON public.questions;
-CREATE POLICY "Admins can manage questions." ON public.questions FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+
+-- 10. ULTIMATE RECURSION & COLUMN FIX
+-- Run these extra lines to ensure Bio and Phone Numbers work without hangs
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile." ON public.profiles;
+DROP POLICY IF EXISTS "Users can manage own profile" ON public.profiles;
+
+CREATE POLICY "profiles_select_fast" ON public.profiles FOR SELECT USING (true);
+CREATE POLICY "profiles_update_own" ON public.profiles FOR ALL USING (auth.uid() = id);
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS roll_number TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE public.profiles ALTER COLUMN roll_number TYPE TEXT;
+ALTER TABLE public.profiles ALTER COLUMN phone TYPE TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS expertise TEXT[] DEFAULT '{}';
+
+NOTIFY pgrst, 'reload schema';

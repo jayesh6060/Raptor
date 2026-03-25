@@ -26,10 +26,18 @@ const getStored = (key: string) => {
   if (typeof window === 'undefined') return null;
   const val = localStorage.getItem(key);
   try {
-    return val ? JSON.parse(val) : null;
+    const parsed = val ? JSON.parse(val) : null;
+    // Robust check: Ensure we didn't get a double-stringified value
+    if (parsed && typeof parsed === 'object') return parsed;
+    if (typeof parsed === 'string') {
+       // Deep parse just in case
+       const deepParsed = JSON.parse(parsed);
+       return (deepParsed && typeof deepParsed === 'object') ? deepParsed : null;
+    }
   } catch {
     return null;
   }
+  return null;
 };
 
 // The middleware now handles authentication hint cookies automatically.
@@ -75,28 +83,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!mounted) return;
         
         try {
-          const currentUser = session?.user ?? null;
+          // Robust Protection: If session is mistakenly passed as a string, parse it
+          let actualSession = session;
+          if (typeof session === 'string') {
+              try { actualSession = JSON.parse(session); } catch { actualSession = null; }
+          }
+
+          const currentUser = actualSession?.user ?? null;
           
-          // Update user state immediately
-          setUser(currentUser);
-          if (typeof window !== 'undefined') {
-            if (currentUser) {
+          // Update user state immediately with object-safety
+          if (currentUser && typeof currentUser === 'object') {
+            setUser(currentUser);
+            if (typeof window !== 'undefined') {
               localStorage.setItem('raptor_user', JSON.stringify(currentUser));
-            } else {
+            }
+          } else {
+            setUser(null);
+            if (typeof window !== 'undefined') {
               localStorage.removeItem('raptor_user');
-              localStorage.removeItem('raptor_profile');
             }
           }
 
-          if (currentUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
+          if (currentUser && typeof currentUser === 'object' && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
             const { data, error } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', currentUser.id)
               .single();
             
-            if (error && error.message.includes('steal')) {
-               // Ignore lock errors from Turbopack/Dev-server
+            if (error && (error.message.includes('steal') || error.message.includes('JSON'))) {
+               // Ignore dev locks or malformed JSON responses
                return;
             }
 
@@ -111,14 +127,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               setProfile(null);
               setLoading(false);
             }
-          } else {
-             if (mounted && !currentUser) setLoading(false);
           }
-        } catch (err: unknown) {
-          const error = err as any;
-          console.error('Auth state change error:', error);
-          if (error.message?.toLowerCase().includes('refresh token')) {
-            await signOut();
+        } catch (err: any) {
+          console.error('CRITICAL AUTH ERROR (AUTO-REPAIRING):', err);
+          // If we hit a property-on-string error, purge everything
+          if (err.message?.includes('property') || err.message?.includes('string')) {
+             if (typeof window !== 'undefined') {
+                localStorage.clear();
+                window.location.reload();
+             }
           }
         } finally {
           if (mounted) setLoading(false);

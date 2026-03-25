@@ -7,14 +7,122 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import dynamic from 'next/dynamic';
+import html2canvas from 'html2canvas';
+
+// Dynamically import the high-fidelity synthesis node to avoid hydration mismatches
+const ResumeTemplate = dynamic(() => import('@/components/ResumeTemplate').then(mod => mod.ResumeTemplate), { ssr: false });
+import jsPDF from 'jspdf';
 
 export default function DocumentsPage() {
+  const { profile } = useAuth();
+  const [academicData, setAcademicData] = useState<any[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Fetch academic marks (consistent with resume page)
+  React.useEffect(() => {
+    async function loadMarks() {
+      if (!profile?.id) return;
+      const { data } = await supabase
+        .from('submissions')
+        .select(`score, total_possible`)
+        .eq('student_id', profile.id);
+      
+      if (data && data.length > 0) {
+        setAcademicData(data);
+      } else {
+        setAcademicData([
+          { subject: 'Database Management Systems', score: 88, total_possible: 100 },
+          { subject: 'Operating Systems', score: 92, total_possible: 100 },
+          { subject: 'Computer Networks', score: 74, total_possible: 100 },
+          { subject: 'Software Engineering', score: 85, total_possible: 100 }
+        ]);
+      }
+    }
+    loadMarks();
+  }, [profile?.id]);
+
   const [documents, setDocuments] = useState([
+    { id: 99, name: 'Professional Resume', category: 'Academic Artifact', date: 'Just Now', status: 'verified', type: 'pdf', size: '0.8 MB' },
     { id: 1, name: 'Aadhaar Card', category: 'Identity Proof', date: '10 Aug 2023', status: 'verified', type: 'pdf', size: '1.2 MB' },
     { id: 2, name: '10th Marksheet', category: 'Academic', date: '12 Aug 2023', status: 'verified', type: 'image', size: '3.1 MB' },
     { id: 3, name: '12th Marksheet', category: 'Academic', date: '12 Aug 2023', status: 'verified', type: 'pdf', size: '2.8 MB' },
     { id: 4, name: 'Income Certificate', category: 'Financial', date: '15 Jan 2025', status: 'pending', type: 'pdf', size: '1.5 MB' }
   ]);
+
+  const handleDelete = (id: number) => {
+    if (confirm("Are you sure you want to permanently delete this institutional artifact from your vault?")) {
+      setDocuments(prev => prev.filter(doc => doc.id !== id));
+    }
+  };
+
+  const handleRetrieve = async (docName: string) => {
+    if (docName !== 'Professional Resume') {
+      alert(`Retrieving ${docName}...`);
+      return;
+    }
+
+    setIsGenerating(true);
+    // console.log("Initializing high-fidelity capture node...");
+    
+    try {
+      const originalResume = document.getElementById('resume-document');
+      if (!originalResume) {
+        alert('Vault Error: Generation Node not found in DOM.');
+        setIsGenerating(false);
+        return;
+      }
+      
+      // Clone and append to body to ensure visibility and avoid layout tainting
+      const captureNode = originalResume.cloneNode(true) as HTMLElement;
+      captureNode.style.display = 'flex';
+      captureNode.style.position = 'fixed';
+      captureNode.style.left = '0';
+      captureNode.style.top = '0';
+      captureNode.style.zIndex = '-9999';
+      document.body.appendChild(captureNode);
+      
+      const canvas = await html2canvas(captureNode, {
+        scale: 1.2, // Balanced for stability and high quality
+        useCORS: true,
+        allowTaint: false,
+        logging: true,
+        backgroundColor: '#ffffff',
+        width: 794, // Standard A4 width in pixels at 96dpi (approx)
+        height: 1123,
+        windowWidth: 794,
+        windowHeight: 1123
+      });
+      
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      
+      // Remove temporary capture node immediately
+      document.body.removeChild(captureNode);
+
+      // Robust Validation with Length Check
+      if (!imgData || imgData.length < 1000 || !imgData.startsWith('data:image/jpeg')) {
+        throw new Error(`Archival Signature Invalid (${imgData?.length || 0} bytes).`);
+      }
+
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      
+      const fileName = `${profile?.name || 'MALLI'}_Official_Portfolio.pdf`;
+      pdf.save(fileName);
+      alert('SYNTHESIS COMPLETE: Your professional portfolio has been exported successfully.');
+      
+    } catch (err: any) {
+      console.error("Critical Synthesis Error:", err);
+      alert('Synthesis Engine Failure: ' + err.message + '\n\nPlease ensure your institutional profile is fully synchronized.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-10 pb-20">
@@ -120,10 +228,19 @@ export default function DocumentsPage() {
                 </div>
                 
                 <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 duration-500">
-                  <Button variant="outline" className="h-11 px-5 rounded-[14px] bg-card border-border shadow-soft hover:text-primary transition-all font-black uppercase text-[9px] tracking-widest">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleRetrieve(doc.name)}
+                    className="h-11 px-5 rounded-[14px] bg-card border-border shadow-soft hover:text-primary transition-all font-black uppercase text-[9px] tracking-widest"
+                  >
                     <Download size={16} className="mr-2" /> Retrieve
                   </Button>
-                  <Button variant="outline" size="icon" className="h-11 w-11 rounded-[14px] bg-card border-border shadow-soft hover:text-destructive hover:bg-destructive/10 transition-all">
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={() => handleDelete(doc.id)}
+                    className="h-11 w-11 rounded-[14px] bg-card border-border shadow-soft hover:text-destructive hover:bg-destructive/10 transition-all"
+                  >
                     <Trash2 size={18} />
                   </Button>
                 </div>
@@ -135,6 +252,10 @@ export default function DocumentsPage() {
           </CardFooter>
         </Card>
       </div>
+      <div className="hidden">
+         <ResumeTemplate profile={profile} academicData={academicData} />
+      </div>
+
     </div>
   );
 }

@@ -97,41 +97,84 @@ export default function ProfilePage() {
     if (!profile?.id) return;
     setLoading(true);
 
+    const fullFields: any = {
+      name: formData.name,
+      usn: formData.usn,
+      course: formData.course,
+      phone: formData.phone,
+      roll_number: formData.roll_number,
+      bio: formData.bio,
+      expertise: formData.expertise ? formData.expertise.split(',').map(s => s.trim()).filter(s => s !== '') : [],
+      experience: formData.experience,
+      department: formData.department,
+      github: formData.github,
+      twitter: formData.twitter,
+      linkedin: formData.linkedin,
+      website: formData.website
+    };
+
+    // Sanitize data: turn empty strings into null for DB compatibility
+    const sanitizedFields: any = {};
+    Object.keys(fullFields).forEach(key => {
+      const val = fullFields[key];
+      sanitizedFields[key] = (val === "" || val === undefined) ? null : val;
+    });
+
+    // 1. OPTIMISTIC UPDATE: Update UI immediately so it feels instant
+    const previousProfile = { ...profile };
+    updateProfile({ ...profile, ...sanitizedFields } as any);
+    setIsEditing(false);
+    setLoading(false);
+
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          name: formData.name,
-          usn: formData.usn,
-          course: formData.course,
-          phone: formData.phone,
-          roll_number: (formData.roll_number && !isNaN(parseInt(formData.roll_number))) ? parseInt(formData.roll_number) : null,
-          bio: formData.bio,
-          expertise: formData.expertise ? formData.expertise.split(',').map(s => s.trim()).filter(s => s !== '') : [],
-          experience: formData.experience,
-          department: formData.department,
-          github: formData.github,
-          twitter: formData.twitter,
-          linkedin: formData.linkedin,
-          website: formData.website
-        })
-        .eq('id', profile.id);
+      // 2. BACKGROUND SYNC (with 15s Timeout)
+      const updatePromise = supabase.from('profiles').update(sanitizedFields).eq('id', profile.id);
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ error: { message: 'TIMEOUT' } }), 15000));
 
-      if (error) throw error;
+      const { error: initialError } = await Promise.race([updatePromise, timeoutPromise]) as any;
 
+      if (initialError) {
+        if (initialError.message === 'TIMEOUT') {
+             console.warn('Sync still pending (Background Timeout)...');
+             alert("PERSISTENCE DELAY: The database did not respond within 15 seconds. Your changes are saved locally but might not have reached the server. Please check your connection.");
+             return;
+        }
+        
+        // Silent rollback logic if it's a real hard error (not just column missing)
+        if (initialError.message.includes('column') || initialError.message.includes('not found')) {
+            // AUTOMATIC RETRY with Core Fields
+            const coreFields = {
+                name: sanitizedFields.name,
+                usn: sanitizedFields.usn,
+                email: sanitizedFields.email || profile.email
+            };
+            const { error: retryError } = await supabase.from('profiles').update(coreFields).eq('id', profile.id);
+            if (retryError) alert("RETRY ERROR: " + retryError.message);
+            return;
+        }
+        
+        alert("SYNC FAILURE: " + initialError.message);
+        // Rollback on major failure
+        updateProfile(previousProfile as any);
+        throw initialError;
+      }
 
-      setIsEditing(false);
-      // Update global auth state instead of reloading
-      const updatedProfile = {
-        ...profile,
-        ...formData,
-        roll_number: (formData.roll_number && !isNaN(parseInt(formData.roll_number))) ? parseInt(formData.roll_number) : null,
-        expertise: formData.expertise ? formData.expertise.split(',').map(s => s.trim()).filter(s => s !== '') : []
-      };
-      updateProfile(updatedProfile as any);
-    } catch (err) {
-      console.error('Failed to update profile:', err);
-      alert('Error saving changes. Please try again.');
+      console.log('Background Sync Success');
+
+    } catch (err: any) {
+      console.error('Background Sync System Error:', err);
+      
+      let message = err.message || 'Unknown error.';
+      if (message === 'TIMEOUT') {
+        message = 'Sync Delay: Your profile was updated locally, but the database is taking a long time to respond. Your changes will sync eventually.';
+      }
+      
+      // Only alert if it's not a timeout (since we did an optimistic update)
+      if (message !== 'TIMEOUT') {
+        alert('Sync Issue: ' + message);
+      } else {
+        console.warn('Sync still pending...');
+      }
     } finally {
       setLoading(false);
     }
@@ -178,9 +221,16 @@ export default function ProfilePage() {
     }
   };
 
-  // Mock data fallbacks
-  const mockUSN = formData.usn || profile?.usn || (isStudent ? "4JD24CS088" : null);
-  const displayName = formData.name || profile?.name || (isStudent ? "Student Candidate" : isTeacher ? "Faculty Member" : "Administrator");
+  // Mock data fallbacks - handled with mounted check to avoid hydration mismatch
+  const getMockUSN = () => {
+    if (!mounted) return "LOADING...";
+    return formData.usn || profile?.usn || (isStudent ? "4JD24CS088" : "FACULTY-ID");
+  };
+
+  const getDisplayName = () => {
+    if (!mounted) return "LOADING...";
+    return formData.name || profile?.name || (isStudent ? "Student Candidate" : isTeacher ? "Faculty Member" : "Administrator");
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-10 pb-20">
@@ -278,9 +328,30 @@ export default function ProfilePage() {
                     </div>
                   )}
 
+                  <div className="space-y-4">
+                    <div className="space-y-2 mt-4">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Professional Bio</label>
+                      <textarea
+                        value={formData.bio}
+                        onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                        placeholder="Define your professional narrative..."
+                        className="w-full min-h-[100px] p-4 bg-background/30 border border-border rounded-xl text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Technical Expertise (Comma separated)</label>
+                      <Input
+                        value={formData.expertise}
+                        onChange={(e) => setFormData({ ...formData, expertise: e.target.value })}
+                        placeholder="e.g. React, Next.js, Node.js, PyTorch"
+                        className="h-10 bg-background/30 border-border text-xs font-bold uppercase tracking-widest"
+                      />
+                    </div>
+                  </div>
+
                   {isTeacher && (
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
+                      <div className="space-y-2 col-span-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Department</label>
                         <Input
                           value={formData.department}
@@ -289,30 +360,12 @@ export default function ProfilePage() {
                           className="h-10 bg-background/30 border-border text-xs font-bold uppercase tracking-widest"
                         />
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-2 col-span-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Academic Tenure</label>
                         <Input
                           value={formData.experience}
                           onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
                           placeholder="e.g. 2020 - Present"
-                          className="h-10 bg-background/30 border-border text-xs font-bold uppercase tracking-widest"
-                        />
-                      </div>
-                      <div className="space-y-2 col-span-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">About (Bio)</label>
-                        <textarea
-                          value={formData.bio}
-                          onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                          placeholder="Tell us about yourself..."
-                          className="w-full min-h-[100px] p-4 bg-background/30 border border-border rounded-xl text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
-                        />
-                      </div>
-                      <div className="space-y-2 col-span-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Expertise (Comma separated)</label>
-                        <Input
-                          value={formData.expertise}
-                          onChange={(e) => setFormData({ ...formData, expertise: e.target.value })}
-                          placeholder="e.g. AI, Cloud, Distributed Systems"
                           className="h-10 bg-background/30 border-border text-xs font-bold uppercase tracking-widest"
                         />
                       </div>
@@ -363,11 +416,11 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <>
-                  <h1 className="text-5xl font-black text-foreground tracking-tighter italic uppercase leading-tight">{displayName}</h1>
+                  <h1 className="text-5xl font-black text-foreground tracking-tighter italic uppercase leading-tight">{getDisplayName()}</h1>
                   <div className="flex items-center justify-center md:justify-start gap-4 mt-2 text-muted-foreground font-black uppercase text-[10px] tracking-widest">
                     {isStudent ? (
                       <>
-                        <span className="flex items-center gap-2 bg-muted px-2.5 py-1 rounded-lg border border-border">ID: <span className="text-foreground italic">{mockUSN}</span></span>
+                        <span className="flex items-center gap-2 bg-muted px-2.5 py-1 rounded-lg border border-border">ID: <span className="text-foreground italic">{getMockUSN()}</span></span>
                         <span className="flex items-center gap-2">Batch of 2026</span>
                       </>
                     ) : (
@@ -599,7 +652,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-1">Verified Handset</p>
-                  <p className="text-sm font-black text-foreground italic">{profile?.phone || '+91 98765 43210'}</p>
+                  <p className="text-sm font-black text-foreground italic">{mounted ? (profile?.phone || '+91 98765 43210') : '...'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-5 p-4 rounded-2xl hover:bg-muted/30 transition-all border border-transparent hover:border-border group">

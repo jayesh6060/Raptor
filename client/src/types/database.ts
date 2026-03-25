@@ -6,7 +6,7 @@ export type Profile = {
   avatar?: string;
   usn?: string;
   course?: string;
-  roll_number?: number;
+  roll_number?: string;
   phone?: string;
   bio?: string;
   expertise?: string[];
