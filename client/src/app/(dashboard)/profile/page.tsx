@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -33,7 +33,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Loader2, Check, X } from 'lucide-react';
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   const { profile, updateProfile } = useAuth();
 
   const searchParams = useSearchParams();
@@ -673,3 +673,17 @@ export default function ProfilePage() {
   );
 }
 
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="animate-spin text-primary" size={40} />
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Initializing Profile Node...</p>
+        </div>
+      </div>
+    }>
+      <ProfilePageContent />
+    </Suspense>
+  );
+}
