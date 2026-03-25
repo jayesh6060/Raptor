@@ -1,18 +1,19 @@
-'use client';
+"use client";
+export const dynamic = "force-dynamic";
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import { 
-  User, 
-  MapPin, 
-  Mail, 
-  Phone, 
-  BookOpen, 
-  Code2, 
-  Briefcase, 
-  FolderGit2, 
+import {
+  User,
+  MapPin,
+  Mail,
+  Phone,
+  BookOpen,
+  Code2,
+  Briefcase,
+  FolderGit2,
   GraduationCap,
   Award,
   Shield,
@@ -34,11 +35,11 @@ import { Loader2, Check, X } from 'lucide-react';
 
 export default function ProfilePage() {
   const { profile, updateProfile } = useAuth();
-  
+
   const searchParams = useSearchParams();
   const router = useRouter();
   const editMode = searchParams.get('edit') === 'true';
-  
+
   const [isEditing, setIsEditing] = useState(editMode);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -95,7 +96,7 @@ export default function ProfilePage() {
   const handleSave = async () => {
     if (!profile?.id) return;
     setLoading(true);
-    
+
     try {
       const { error } = await supabase
         .from('profiles')
@@ -117,13 +118,13 @@ export default function ProfilePage() {
         .eq('id', profile.id);
 
       if (error) throw error;
-      
-      
+
+
       setIsEditing(false);
       // Update global auth state instead of reloading
-      const updatedProfile = { 
-        ...profile, 
-        ...formData, 
+      const updatedProfile = {
+        ...profile,
+        ...formData,
         roll_number: (formData.roll_number && !isNaN(parseInt(formData.roll_number))) ? parseInt(formData.roll_number) : null,
         expertise: formData.expertise ? formData.expertise.split(',').map(s => s.trim()).filter(s => s !== '') : []
       };
@@ -135,10 +136,10 @@ export default function ProfilePage() {
       setLoading(false);
     }
   };
-  
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!profile?.id || !e.target.files || e.target.files.length === 0) return;
-    
+
     setUploadingAvatar(true);
     const file = e.target.files[0];
     const fileExt = file.name.split('.').pop();
@@ -180,47 +181,47 @@ export default function ProfilePage() {
   // Mock data fallbacks
   const mockUSN = formData.usn || profile?.usn || (isStudent ? "4JD24CS088" : null);
   const displayName = formData.name || profile?.name || (isStudent ? "Student Candidate" : isTeacher ? "Faculty Member" : "Administrator");
-  
+
   return (
     <div className="max-w-7xl mx-auto space-y-10 pb-20">
-      
+
       {/* 1. Profile Identity Header */}
       <Card className="border-border shadow-strong overflow-hidden bg-card/50 backdrop-blur-md relative">
         <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-[120px] -mr-32 -mt-32 pointer-events-none" />
         <CardContent className="p-10 relative z-10 flex flex-col md:flex-row items-center gap-10">
           <div className="relative group">
             <div className="w-32 h-32 rounded-3xl bg-muted text-muted-foreground flex items-center justify-center border-4 border-card shadow-strong overflow-hidden group-hover:scale-105 transition-transform duration-500">
-               {(profile?.avatar || uploadingAvatar) ? (
-                 <div className="relative w-full h-full">
-                    {uploadingAvatar && (
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
-                        <Loader2 className="animate-spin text-white" size={32} />
-                      </div>
-                    )}
-                    <img src={profile?.avatar} alt="Profile" className="w-full h-full object-cover" />
-                 </div>
-               ) : (
-                 <User size={64} className="opacity-20" />
-               )}
+              {(profile?.avatar || uploadingAvatar) ? (
+                <div className="relative w-full h-full">
+                  {uploadingAvatar && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
+                      <Loader2 className="animate-spin text-white" size={32} />
+                    </div>
+                  )}
+                  <img src={profile?.avatar} alt="Profile" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <User size={64} className="opacity-20" />
+              )}
             </div>
-            <Button 
-              size="icon" 
-              variant="gradient" 
+            <Button
+              size="icon"
+              variant="gradient"
               className="absolute -bottom-2 -right-2 h-10 w-10 rounded-xl shadow-strong border-2 border-card"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingAvatar}
             >
               {uploadingAvatar ? <Loader2 className="animate-spin" size={18} /> : <PlusIcon size={18} />}
             </Button>
-            <input 
-              type="file" 
+            <input
+              type="file"
               ref={fileInputRef}
               onChange={handleAvatarUpload}
               accept="image/*"
               className="hidden"
             />
           </div>
-          
+
           <div className="flex-1 text-center md:text-left space-y-4">
             <div className="flex flex-wrap justify-center md:justify-start gap-3">
               <Badge variant="glass" className="text-[9px] font-black tracking-widest bg-primary/10 text-primary border-primary/20 px-3 py-1">
@@ -229,7 +230,7 @@ export default function ProfilePage() {
               </Badge>
               <Badge variant="secondary" className="text-[9px] font-black tracking-widest bg-muted/50 border-border px-3 py-1">VERIFIED MEMBER</Badge>
             </div>
-            
+
             <div>
               {!mounted ? (
                 <span className="block h-12 w-64 bg-muted animate-pulse rounded-xl" />
@@ -237,7 +238,7 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Full Name</label>
-                    <Input 
+                    <Input
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="Enter full name"
@@ -249,7 +250,7 @@ export default function ProfilePage() {
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">USN ID</label>
-                        <Input 
+                        <Input
                           value={formData.usn}
                           onChange={(e) => setFormData({ ...formData, usn: e.target.value })}
                           placeholder="Enter USN"
@@ -258,7 +259,7 @@ export default function ProfilePage() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Phone Number</label>
-                        <Input 
+                        <Input
                           value={formData.phone}
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                           placeholder="Contact Number"
@@ -267,7 +268,7 @@ export default function ProfilePage() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Roll Number</label>
-                        <Input 
+                        <Input
                           value={formData.roll_number}
                           onChange={(e) => setFormData({ ...formData, roll_number: e.target.value })}
                           placeholder="Roll No"
@@ -281,7 +282,7 @@ export default function ProfilePage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Department</label>
-                        <Input 
+                        <Input
                           value={formData.department}
                           onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                           placeholder="e.g. Computer Science"
@@ -290,7 +291,7 @@ export default function ProfilePage() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Academic Tenure</label>
-                        <Input 
+                        <Input
                           value={formData.experience}
                           onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
                           placeholder="e.g. 2020 - Present"
@@ -299,7 +300,7 @@ export default function ProfilePage() {
                       </div>
                       <div className="space-y-2 col-span-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">About (Bio)</label>
-                        <textarea 
+                        <textarea
                           value={formData.bio}
                           onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                           placeholder="Tell us about yourself..."
@@ -308,7 +309,7 @@ export default function ProfilePage() {
                       </div>
                       <div className="space-y-2 col-span-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Expertise (Comma separated)</label>
-                        <Input 
+                        <Input
                           value={formData.expertise}
                           onChange={(e) => setFormData({ ...formData, expertise: e.target.value })}
                           placeholder="e.g. AI, Cloud, Distributed Systems"
@@ -323,7 +324,7 @@ export default function ProfilePage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">GitHub</label>
-                        <Input 
+                        <Input
                           value={formData.github}
                           onChange={(e) => setFormData({ ...formData, github: e.target.value })}
                           placeholder="https://github.com/..."
@@ -332,7 +333,7 @@ export default function ProfilePage() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Twitter</label>
-                        <Input 
+                        <Input
                           value={formData.twitter}
                           onChange={(e) => setFormData({ ...formData, twitter: e.target.value })}
                           placeholder="https://twitter.com/..."
@@ -341,7 +342,7 @@ export default function ProfilePage() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">LinkedIn</label>
-                        <Input 
+                        <Input
                           value={formData.linkedin}
                           onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
                           placeholder="https://linkedin.com/in/..."
@@ -350,7 +351,7 @@ export default function ProfilePage() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Website</label>
-                        <Input 
+                        <Input
                           value={formData.website}
                           onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                           placeholder="https://..."
@@ -380,23 +381,23 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
-          
+
           <div className="flex flex-col gap-3 min-w-[180px]">
             {isEditing ? (
               <>
-                <Button 
+                <Button
                   onClick={handleSave}
                   disabled={loading}
-                  variant="gradient" 
+                  variant="gradient"
                   className="h-12 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-strong"
                 >
                   {loading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Check size={16} className="mr-2" />}
                   Save Changes
                 </Button>
-                <Button 
+                <Button
                   onClick={() => setIsEditing(false)}
                   disabled={loading}
-                  variant="secondary" 
+                  variant="secondary"
                   className="h-12 rounded-xl font-black uppercase text-[10px] tracking-widest"
                 >
                   <X size={16} className="mr-2" />
@@ -405,35 +406,35 @@ export default function ProfilePage() {
               </>
             ) : (
               <>
-                <Button 
+                <Button
                   onClick={() => setIsEditing(true)}
-                  variant="gradient" 
+                  variant="gradient"
                   className="h-12 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-strong"
                 >
                   <Edit3 size={16} className="mr-2" />
                   Modify Profile
                 </Button>
-                   <div className="flex gap-2 justify-center md:justify-end">
-                    {[
-                      { icon: Github, url: profile?.github },
-                      { icon: Twitter, url: profile?.twitter },
-                      { icon: Linkedin, url: profile?.linkedin },
-                      { icon: Globe, url: profile?.website }
-                    ].map(({ icon: Icon, url }, i) => (
-                      <Button 
-                        key={i} 
-                        variant="outline" 
-                        size="icon" 
-                        className={cn(
-                          "h-10 w-10 rounded-xl bg-card border-border shadow-soft transition-all",
-                          url ? "text-primary hover:text-primary hover:scale-110" : "opacity-20 cursor-not-allowed"
-                        )}
-                        onClick={() => url && window.open(url, '_blank')}
-                      >
-                        <Icon size={16} />
-                      </Button>
-                    ))}
-                  </div>
+                <div className="flex gap-2 justify-center md:justify-end">
+                  {[
+                    { icon: Github, url: profile?.github },
+                    { icon: Twitter, url: profile?.twitter },
+                    { icon: Linkedin, url: profile?.linkedin },
+                    { icon: Globe, url: profile?.website }
+                  ].map(({ icon: Icon, url }, i) => (
+                    <Button
+                      key={i}
+                      variant="outline"
+                      size="icon"
+                      className={cn(
+                        "h-10 w-10 rounded-xl bg-card border-border shadow-soft transition-all",
+                        url ? "text-primary hover:text-primary hover:scale-110" : "opacity-20 cursor-not-allowed"
+                      )}
+                      onClick={() => url && window.open(url, '_blank')}
+                    >
+                      <Icon size={16} />
+                    </Button>
+                  ))}
+                </div>
               </>
             )}
           </div>
@@ -441,10 +442,10 @@ export default function ProfilePage() {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-        
+
         {/* LEFT COLUMN: Deep Details */}
         <div className="lg:col-span-8 space-y-10">
-          
+
           {/* About Section */}
           <Card className="border-border shadow-soft bg-card/50 backdrop-blur-md">
             <CardHeader className="p-8 border-b border-border bg-muted/30">
@@ -459,7 +460,7 @@ export default function ProfilePage() {
               <p className="text-muted-foreground leading-relaxed font-medium text-base">
                 {!mounted ? (
                   <span className="block h-4 w-full bg-muted animate-pulse rounded" />
-                ) : profile?.bio || (isStudent 
+                ) : profile?.bio || (isStudent
                   ? "I am a high-performance candidate specializing in Computer Science, deeply integrated with the modern tech stack. Currently focused on building scalable cloud solutions and mastering distributed systems architecture."
                   : "Distinguished academician with over a decade of excellence in higher education and technical research. Spearheading the next generation of engineers through rigorous practical instruction and innovative curriculum design.")}
               </p>
@@ -484,7 +485,7 @@ export default function ProfilePage() {
                   <div className="flex gap-2">
                     {[1, 2, 3].map(i => <div key={i} className="h-8 w-20 bg-muted animate-pulse rounded-xl" />)}
                   </div>
-                ) : ( (profile?.expertise && profile.expertise.length > 0) ? profile.expertise : (isStudent 
+                ) : ((profile?.expertise && profile.expertise.length > 0) ? profile.expertise : (isStudent
                   ? ['JavaScript', 'TypeScript', 'React.js', 'Next.js', 'Node.js', 'PostgreSQL', 'TailwindCSS', 'Git', 'Docker', 'AWS']
                   : ['Curriculum Design', 'Academic Research', 'Student Mentoring', 'Course Management', 'Educational Leadership', 'System Architecture'])
                 ).map(skill => (
@@ -526,7 +527,7 @@ export default function ProfilePage() {
                   <p className="text-muted-foreground font-medium mt-6 leading-relaxed bg-muted/20 p-5 rounded-2xl border border-border">
                     {!mounted ? (
                       <span className="block h-12 w-full bg-muted animate-pulse rounded" />
-                    ) : (isStudent 
+                    ) : (isStudent
                       ? "Orchestrated complex frontend architectures and implemented reactive data-binding protocols. Streamlined API integration workflows by 40% using modern TypeScript patterns."
                       : "Architecting the technical foundation of the engineering department. Directing large-scale research initiatives in high-performance computing and student logic development.")}
                   </p>
@@ -539,7 +540,7 @@ export default function ProfilePage() {
 
         {/* RIGHT COLUMN: Static Metrics */}
         <div className="lg:col-span-4 space-y-10">
-          
+
           {/* Institutional Anchor */}
           <Card className="border-border shadow-soft bg-card/50 backdrop-blur-md">
             <CardHeader className="p-8 bg-muted/30 border-b border-border">
@@ -554,7 +555,7 @@ export default function ProfilePage() {
               <div className="space-y-6">
                 <div className="p-6 bg-primary/5 rounded-2xl border border-primary/10 space-y-4">
                   <div className="w-12 h-12 bg-white dark:bg-card border border-primary/20 rounded-xl flex items-center justify-center shadow-soft">
-                     <Zap size={24} className="text-primary" />
+                    <Zap size={24} className="text-primary" />
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-black text-foreground uppercase text-base tracking-tight italic leading-none">Global Institute</h3>
